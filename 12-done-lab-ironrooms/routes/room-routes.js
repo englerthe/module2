@@ -7,12 +7,13 @@ const Room = require('../models/room-model');
 const fileUploader = require('../config/upload-setup/cloudinary');
 
 
+
+
+
 // GET route to display the form to create a room
 router.get('/rooms/add', isLoggedIn, (req, res, next) => {
   res.render('room-pages/add-room');
 });
-
-
 
 // POST route to create the room -> has the image uploading example 🥳
 
@@ -26,8 +27,8 @@ router.post('/create-room', fileUploader.single('imageUrl'),(req, res, next) => 
   Room.create({
     name,
     description,
-    imageUrl: req.file.secure_url,
-    owner: req.user._id
+    imageUrl: '',
+    owner: req.session.currentUser._id
   })
   .then( newRoom => {
     // console.log('room created: ', newRoom)
@@ -57,8 +58,8 @@ router.get('/rooms', (req, res, next) => {
       // and that will help you to allow that currently logged in user can edit and delete only the rooms they created
       
       // if there's a user in a session:
-      if(req.user){
-        if(oneRoom.owner.equals(req.user._id)){
+      if(req.session.currentUser){
+        if(oneRoom.owner.equals(req.session.currentUser._id)){
           oneRoom.isOwner = true;
         }
       }
@@ -78,13 +79,13 @@ router.get('/rooms/:roomId',isLoggedIn, (req, res, next) => {
   .then(foundRoom => {
 
     // console.log(' == = = = == = == = ', foundRoom);
-    if(foundRoom.owner.equals(req.user._id)){
+    if(foundRoom.owner.equals(req.session.currentUser._id)){
       foundRoom.isOwner = true;
     }
     
     // go through all the reviews and check which ones are created by currently logged in user
     Promise.all(foundRoom.reviews.filter(singleReview => {                      //          |
-      if(singleReview.user._id.equals(req.user._id)){   // <--------------------------------|
+      if(singleReview.user._id.equals(req.session.currentUser._id)){   // <--------------------------------|
         // and if that's the case, create new property in the each review that satisfies criteria
         // and use this property when looping through the array of reviews in hbs file to make sure
         // that logged in user can only edit and delete the reviews they created 
@@ -109,8 +110,9 @@ router.post('/rooms/:roomId/update', fileUploader.single('imageUrl'),(req, res, 
   const updatedRoom = { // <---------------------------------------
     name,                                                         //  |
     description,                                                  //  |
-    owner: req.user._id	                                          //  |
-  }                                                               //  |
+    owner: req.session.currentUser._id	                                          //  |
+  }                               
+  console.log(req.session.currentUser._id)                                //  |
   // if the user changed the picture, 'req.file' will exist       //  |
   // and then we create additional property updatedRoom.imageUrl  //  |
   // inside 'updatedRoom' object                                  //  |                 
@@ -121,7 +123,7 @@ router.post('/rooms/:roomId/update', fileUploader.single('imageUrl'),(req, res, 
   Room.findByIdAndUpdate(req.params.roomId, updatedRoom) // <----------
   .then( theUpdatedRoom => {
     // console.log(theUpdatedRoom);
-    res.redirect(`/rooms/${updatedRoom._id}`);
+    res.redirect(`/rooms/${req.params.roomId}`);
   } )
   .catch( err => next(err) )
 })
@@ -139,10 +141,9 @@ router.post('/rooms/:id/delete', (req, res, next) => {
 // this is the function we use to make sure the route and the functionality is 
 // available only if we have user in the session
 function isLoggedIn(req, res, next){
-  if(req.user){
+  if(req.session.currentUser){
     next();
   } else  {
-    req.flash('error', 'You need to log in in order to access the page.')
     res.redirect('/login');
   }
 

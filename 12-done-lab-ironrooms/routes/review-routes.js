@@ -8,7 +8,7 @@ const Review = require('../models/review-model');
 router.post('/rooms/:roomId/add-review', (req, res, next) => {
   // step 1: create a new review
   const newComment = {
-    user: req.user._id,
+    user: req.session.currentUser._id,
     comment: req.body.comment,
     canBeChanged: false
   }

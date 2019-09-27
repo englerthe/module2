@@ -1,8 +1,8 @@
 const express = require('express');
 const router = express.Router();
 
-const passport = require('passport');
 const User = require('../models/user-model');
+
 
 const bcrypt = require('bcryptjs');
 const bcryptSalt = 10;
@@ -11,6 +11,7 @@ router.get('/signup', (req, res, next) => {
   res.render('auth/signup');
 })
 
+
 // action="/register"
 router.post('/register', (req, res, next) => {
   const userEmail = req.body.email;
@@ -18,7 +19,6 @@ router.post('/register', (req, res, next) => {
   const userFullName = req.body.fullName;
 
   if(userEmail == '' || userPassword == '' || userFullName == ''){
-    req.flash('error', 'Please fill all the fields.')
     res.render('auth/signup');
     return;
   }
@@ -26,7 +26,6 @@ router.post('/register', (req, res, next) => {
   User.findOne({ email: userEmail })
   .then(foundUser => {
     if(foundUser !==null){
-      req.flash('error', 'Sorry, there is already user with the same email!');
       // here we will redirect to '/login' 
       res.redirect('/login');
       return;
@@ -42,15 +41,8 @@ router.post('/register', (req, res, next) => {
       })
       .then(user => {
         // if all good, log in the user automatically
-          req.login(user, (err) => {
-            if(err){
-              // req.flash.error = 'some message here'
-              req.flash('error', 'Auto login does not work so please log in manually ✌🏻');
-              res.redirect('/login');
-              return;
-            }
-            res.redirect('/private');
-          })
+          req.session.currentUser = user;
+          res.redirect("/private");
       })
       .catch( err => next(err)); //closing User.create()
   })
@@ -58,48 +50,48 @@ router.post('/register', (req, res, next) => {
 })
 
 //////////////// LOGIN /////////////////////
-router.get('/login', (req, res, next) => {
-  res.render('auth/login');
-})
+router.get("/login", (req, res) => {
+  res.render("auth/login");
+});
 
-router.post('/login', passport.authenticate('local', {
-  successRedirect: '/private', // <== successfully logged in
-  failureRedirect: '/login', // <== login failed so go to '/login' to try again
-  failureFlash: true,
-  passReqToCallback: true
-}));
+router.post("/login", (req, res) => {
+  const { email, password } = req.body;
+  if (!email || !password) {
+    res.render("auth/login", { errorMessage: "Both fields are required" });
+
+    return;
+  }
+
+  User.findOne({email: email })
+    .then(user => {
+      console.log('this is ze user: ' + user)
+      if (!user) {
+        console.log('no user')
+        return res.render("auth/login", {
+          errorMessage: "Invalid credentials"
+        });
+      }
+      if (bcrypt.compareSync(password, user.password)) {
+        req.session.currentUser = user;
+        res.redirect("/private");
+      } else {
+        res.render("auth/login", { errorMessage: "Invalid credentials" });
+      }
+    })
+    .catch(err => {
+      res.render("views/signup", { errorMessage: err._message });
+    });
+});
+
 
 //////////////// LOGOUT /////////////////////
 
-router.post('/logout', (req, res, next) => {
-  req.logout(); // <== .logout() method comes from passport and takes care of the destroying the session for us
-  res.redirect('/login');
-})
-
-//////////////// SLACK LOGIN /////////////////////
-router.get('/slack-login', passport.authenticate('slack'));
-
-//   callbackURL: '/slack/callback' => from 'slack-strategy.js'
-router.get('/slack/callback', passport.authenticate('slack', {
-  successReturnToOrRedirect:'/private',
-  successFlash:'Slack login successful!',
-  failureRedirect:'/login',
-  failureMessage:'Slack login failed. Pease try to login manually. 🙏🏻'
-}))
-
-//////////////// GOOGLE LOGIN /////////////////////
-
-router.get("/google-login", passport.authenticate("google", {
-  scope: ["https://www.googleapis.com/auth/plus.login",
-          "https://www.googleapis.com/auth/plus.profile.emails.read"]
-}));
-
-router.get("/google/callback", passport.authenticate("google", {
-  successRedirect: "/private",
-  successMessage: 'Google login successful!',
-  failureRedirect: "/login",
-  failureMessage: 'Google login failed. Please try to login manually.'
-}));
+router.get("/logout", (req, res) => {
+  req.session.destroy(err => {
+    if (err) console.log(err);
+    res.redirect("/");
+  });
+});
 
 
 

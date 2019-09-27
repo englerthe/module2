@@ -3,8 +3,8 @@ const router  = express.Router();
 
 
 router.get('/private', (req, res, next) => {
-  if(!req.user){
-    req.flash('error', 'You have to be logged in sir or madam! 👎')
+  console.log(req.session.currentUser)
+  if(!req.session.currentUser){
     res.redirect('/login');
     return;
   }

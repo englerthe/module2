@@ -10,9 +10,9 @@ const logger       = require('morgan');
 const path         = require('path');
 
 const session = require('express-session');
+const MongoStore = require("connect-mongo")(session);
 
 // import passport docs from config folder
-const passportSetup =  require('./config/passport/passport-setup');
 
 mongoose
   .connect('mongodb://localhost/users-passport', {useNewUrlParser: true})
@@ -57,13 +57,22 @@ app.locals.title = 'Express - Generated with IronGenerator';
 // handle session here:
 // app.js
 app.use(session({
-  secret: "our-passport-local-strategy-app",
-  resave: true,
-  saveUninitialized: true
+  secret: "basic-auth-secret",
+  cookie: { maxAge: 60000 },
+  store: new MongoStore({
+    mongooseConnection: mongoose.connection,
+    ttl: 24 * 60 * 60 // 1 day
+  })
 }));
 
+app.use((req, res, next) => {
+  if(req.session.currentUser){
+    res.locals.currentUser = req.session.currentUser; // <== make currentUser variable available in all hbs whenever we have user in the session
+  }
+  next();
+})
+
 // 🎯🎯🎯 MUST come after the session: 🎯🎯🎯
-passportSetup(app);
 
 
 // ROUTES MIDDLEWARE:
